@@ -1,3 +1,3 @@
-#AudioLibSwitcher_libsoundio
+# AudioLibSwitcher_libsoundio
 
 This is to become an adapter of the `IAudioLibSwitcher` interface for `libsoundio` which is of MIT license. Work in progress...
