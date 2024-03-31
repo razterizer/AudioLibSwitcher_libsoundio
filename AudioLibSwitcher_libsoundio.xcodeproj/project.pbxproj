@@ -14,6 +14,8 @@
 		0739DB2A2BB625FE00964E96 /* libAudioLibSwitcher_libsoundio.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libAudioLibSwitcher_libsoundio.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		0739DB322BB6278A00964E96 /* IAudioLibSwitcher.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IAudioLibSwitcher.h; path = AudioLibSwitcher/IAudioLibSwitcher.h; sourceTree = "<group>"; };
 		0739DB342BB627B400964E96 /* AudioLibSwitcher_libsoundio.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AudioLibSwitcher_libsoundio.h; sourceTree = "<group>"; };
+		0739DB3A2BB71F9900964E96 /* libsoundio_test.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = libsoundio_test.cpp; sourceTree = "<group>"; };
+		0739DB3E2BB97EC300964E96 /* libsoundio_test2.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = libsoundio_test2.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +34,8 @@
 			children = (
 				0739DB312BB6277B00964E96 /* AudioLibSwitcher */,
 				0739DB342BB627B400964E96 /* AudioLibSwitcher_libsoundio.h */,
+				0739DB3A2BB71F9900964E96 /* libsoundio_test.cpp */,
+				0739DB3E2BB97EC300964E96 /* libsoundio_test2.cpp */,
 				0739DB2B2BB625FE00964E96 /* Products */,
 			);
 			sourceTree = "<group>";
