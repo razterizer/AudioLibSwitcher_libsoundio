@@ -11,6 +11,7 @@
 #include <iostream>
 #include <vector>
 #include <soundio/soundio.h>
+#include <future>
 
 
 namespace audio
@@ -31,6 +32,8 @@ namespace audio
       bool is_playing = false;
       bool looping = false;
       float pitch = 0.f;
+      int sample_rate = 44100;
+      std::future<void> playback_handle;
       
       Source_libsoundio(float* audio_data, int sample_count)
       : data(audio_data)
@@ -51,8 +54,15 @@ namespace audio
     {
     private:
       std::vector<Source_libsoundio> m_sources;
+      SoundIo* m_soundio = nullptr;
+      SoundIoOutStream* m_outstream = nullptr;
       
     public:
+      SourceManager_libsoundio(SoundIo* soundio, SoundIoOutStream* outstream)
+        : m_soundio(soundio)
+        , m_outstream(outstream)
+      {}
+      
       size_t add_source(const Source_libsoundio& source)
       {
         auto src_id = m_sources.size();
@@ -80,16 +90,50 @@ namespace audio
             }
       }
       
-      bool is_playing(size_t source_id) const {
-        return source_id < m_sources.size() ? m_sources[source_id].is_playing : false;
+      bool is_playing(size_t source_id) const
+      {
+        if (source_id < m_sources.size())
+        {
+          const auto& source = m_sources[source_id];
+          // Check if the playback handle is valid and if the associated task is still running
+          return source.is_playing && source.playback_handle.valid() && source.playback_handle.wait_for(std::chrono::seconds(0)) == std::future_status::timeout;
+        }
+        else
+        {
+          // Return false if source_id is out of range
+          return false;
+        }
       }
       
       void play(size_t source_id)
       {
         if (source_id < m_sources.size())
         {
-          m_sources[source_id].is_playing = true;
-          // Code to start playing the source using libsoundio
+          auto& source = m_sources[source_id];
+          source.is_playing = true;
+          
+          // Assuming source data and sample count are properly initialized
+          
+          // Configure libsoundio output stream
+          m_outstream = soundio_outstream_create(m_soundio);
+          soundio_outstream_open(m_outstream); //, nullptr, nullptr, SoundIoFormatFloat32NE, source.sample_rate, nullptr, nullptr);
+          soundio_outstream_start(m_outstream);
+          
+          // Write audio data to output stream (simplified example)
+          soundio_outstream_write(m_outstream, source.data, source.sample_count);
+          
+          // Store the playback handle for later use
+          source.playback_handle = std::async(std::launch::async, [&]()
+          {
+            // Wait for playback to complete (simplified example)
+            soundio_flush_events(m_soundio); // This is a blocking call, replace it with proper event handling if needed
+            
+            // Once playback is finished, set is_playing to false
+            source.is_playing = false;
+            
+            // Cleanup libsoundio resources
+            soundio_outstream_destroy(m_outstream);
+          });
         }
       }
       
@@ -159,12 +203,15 @@ namespace audio
       // Additional functions for buffer management can be added here
     };
     
-    SourceManager_libsoundio m_source_manager;
-    BufferManager_libsoundio m_buffer_manager;
+    std::unique_ptr<SourceManager_libsoundio> m_source_manager;
+    std::unique_ptr<BufferManager_libsoundio> m_buffer_manager;
     
   public:
     virtual void init() override
     {
+      m_source_manager = std::make_unique<SourceManager_libsoundio>(m_soundio, m_outstream);
+      m_buffer_manager = std::make_unique<BufferManager_libsoundio>();
+    
       // Initialize libsoundio
       m_soundio = soundio_create();
       if (m_soundio == nullptr)
@@ -187,61 +234,71 @@ namespace audio
     {
       // Create a new source and return its ID
       Source_libsoundio source(nullptr, 0);
-      auto src_id = m_source_manager.add_source(source);
+      auto src_id = m_source_manager->add_source(source);
       return static_cast<unsigned int>(src_id);
     }
     
     void destroy_source(unsigned int src_id) override
     {
-      m_source_manager.remove_source(static_cast<size_t>(src_id));
+      m_source_manager->remove_source(static_cast<size_t>(src_id));
     }
     
     unsigned int create_buffer() override
     {
       // Create a new buffer and return its ID
       Buffer_libsoundio buffer;
-      auto buf_id = m_buffer_manager.add_buffer(buffer);
+      auto buf_id = m_buffer_manager->add_buffer(buffer);
       return static_cast<unsigned int>(buf_id);
     }
     
     void destroy_buffer(unsigned int buf_id) override
     {
-      m_buffer_manager.remove_buffer(static_cast<size_t>(buf_id));
+      m_buffer_manager->remove_buffer(static_cast<size_t>(buf_id));
     }
     
     virtual void play_source(unsigned int src_id) override
     {
-      m_source_manager.play(src_id);
+      m_source_manager->play(src_id);
     }
     
     virtual bool is_source_playing(unsigned int src_id) override
     {
-      return m_source_manager.is_playing(src_id);
+      return m_source_manager->is_playing(src_id);
     }
     
     virtual void pause_source(unsigned int src_id) override
     {
-      m_source_manager.pause(src_id);
+    #if 0
+      m_source_manager->pause(src_id);
+    #endif
     }
     
     virtual void stop_source(unsigned int src_id) override
     {
-      m_source_manager.stop(src_id);
+    #if 0
+      m_source_manager->stop(src_id);
+    #endif
     }
     
     virtual void set_source_volume(unsigned int src_id, float vol) override
     {
-      m_source_manager.set_volume(src_id, vol);
+    #if 0
+      m_source_manager->set_volume(src_id, vol);
+    #endif
     }
     
     virtual void set_source_pitch(unsigned int src_id, float pitch) override
     {
-      m_source_manager.set_pitch(src_id, pitch);
+    #if 0
+      m_source_manager->set_pitch(src_id, pitch);
+    #endif
     }
     
     virtual void set_source_looping(unsigned int src_id, bool loop) override
     {
-      m_source_manager.set_looping(src_id, loop);
+    #if 0
+      m_source_manager->set_looping(src_id, loop);
+    #endif
     }
     
     virtual void detach_source(unsigned int src_id) override
