@@ -13,6 +13,9 @@ xcuserdata/
 xcshareddata/
 xcdebugger/
 
+libsoundio_test
+libsoundio_test2
+
 ### Visual Studio ###
 
 .vs/
