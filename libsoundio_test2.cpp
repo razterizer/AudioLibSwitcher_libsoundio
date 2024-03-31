@@ -4,12 +4,13 @@
  * This file is part of libsoundio, which is MIT licensed.
  * See http://opensource.org/licenses/MIT
  */
-#include <soundio/soundio.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <math.h>
+//#include <soundio/soundio.h>
+//#include <stdio.h>
+//#include <stdlib.h>
+//#include <string.h>
+//#include <stdint.h>
+//#include <math.h>
+#include "AudioLibSwitcher_libsoundio.h"
 
 static int usage(char *exe)
 {
@@ -103,137 +104,21 @@ static void underflow_callback(struct SoundIoOutStream *outstream)
 
 int main(int argc, char **argv)
 {
-  char *exe = argv[0];
+  audio::AudioLibSwitcher_libsoundio libsoundio;
+  
   enum SoundIoBackend backend = SoundIoBackendNone;
-  char *device_id = NULL;
   bool raw = false;
   char *stream_name = NULL;
   double latency = 0.0;
   int sample_rate = 0;
-  for (int i = 1; i < argc; i += 1)
-  {
-    char *arg = argv[i];
-    if (arg[0] == '-' && arg[1] == '-')
-    {
-      if (strcmp(arg, "--raw") == 0)
-      {
-        raw = true;
-      }
-      else
-      {
-        i += 1;
-        if (i >= argc)
-        {
-          return usage(exe);
-        }
-        else if (strcmp(arg, "--backend") == 0)
-        {
-          if (strcmp(argv[i], "dummy") == 0)
-          {
-            backend = SoundIoBackendDummy;
-          }
-          else if (strcmp(argv[i], "alsa") == 0)
-          {
-            backend = SoundIoBackendAlsa;
-          }
-          else if (strcmp(argv[i], "pulseaudio") == 0)
-          {
-            backend = SoundIoBackendPulseAudio;
-          }
-          else if (strcmp(argv[i], "jack") == 0)
-          {
-            backend = SoundIoBackendJack;
-          }
-          else if (strcmp(argv[i], "coreaudio") == 0)
-          {
-            backend = SoundIoBackendCoreAudio;
-          }
-          else if (strcmp(argv[i], "wasapi") == 0)
-          {
-            backend = SoundIoBackendWasapi;
-          }
-          else
-          {
-            fprintf(stderr, "Invalid backend: %s\n", argv[i]);
-            return 1;
-          }
-        }
-        else if (strcmp(arg, "--device") == 0)
-        {
-          device_id = argv[i];
-        }
-        else if (strcmp(arg, "--name") == 0)
-        {
-          stream_name = argv[i];
-        }
-        else if (strcmp(arg, "--latency") == 0)
-        {
-          latency = atof(argv[i]);
-        }
-        else if (strcmp(arg, "--sample-rate") == 0)
-        {
-          sample_rate = atoi(argv[i]);
-        }
-        else
-        {
-          return usage(exe);
-        }
-      }
-    }
-    else
-    {
-      return usage(exe);
-    }
-  }
-  struct SoundIo *soundio = soundio_create();
-  if (!soundio)
-  {
-    fprintf(stderr, "out of memory\n");
-    return 1;
-  }
-  int err = (backend == SoundIoBackendNone) ?
-  soundio_connect(soundio) : soundio_connect_backend(soundio, backend);
-  if (err)
-  {
-    fprintf(stderr, "Unable to connect to backend: %s\n", soundio_strerror(err));
-    return 1;
-  }
-  fprintf(stderr, "Backend: %s\n", soundio_backend_name(soundio->current_backend));
-  soundio_flush_events(soundio);
-  int selected_device_index = -1;
-  if (device_id)
-  {
-    int device_count = soundio_output_device_count(soundio);
-    for (int i = 0; i < device_count; i += 1)
-    {
-      struct SoundIoDevice *device = soundio_get_output_device(soundio, i);
-      if (strcmp(device->id, device_id) == 0 && device->is_raw == raw)
-      {
-        selected_device_index = i;
-        break;
-      }
-    }
-  }
-  else
-  {
-    selected_device_index = soundio_default_output_device_index(soundio);
-  }
-  if (selected_device_index < 0)
-  {
-    fprintf(stderr, "Output device not found\n");
-    return 1;
-  }
-  struct SoundIoDevice *device = soundio_get_output_device(soundio, selected_device_index);
-  if (!device)
-  {
-    fprintf(stderr, "out of memory\n");
-    return 1;
-  }
-  fprintf(stderr, "Output device: %s\n", device->name);
-  if (device->probe_error) {
-    fprintf(stderr, "Cannot probe device: %s\n", soundio_strerror(device->probe_error));
-    return 1;
-  }
+  int err = 0;
+  
+  libsoundio.init();
+  
+  auto* soundio = libsoundio.get_soundio();
+  
+  auto* device = libsoundio.get_device();
+  
   struct SoundIoOutStream *outstream = soundio_outstream_create(device);
   outstream->write_callback = write_callback;
   outstream->underflow_callback = underflow_callback;
@@ -320,8 +205,8 @@ int main(int argc, char **argv)
       fprintf(stderr, "Unrecognized command: %c\n", c);
     }
   }
-  soundio_outstream_destroy(outstream);
-  soundio_device_unref(device);
-  soundio_destroy(soundio);
+  
+  libsoundio.finish();
+  
   return 0;
 }
