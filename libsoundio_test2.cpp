@@ -12,19 +12,7 @@
 //#include <math.h>
 #include "AudioLibSwitcher_libsoundio.h"
 
-static int usage(char *exe)
-{
-  fprintf(stderr, "Usage: %s [options]\n"
-          "Options:\n"
-          "  [--backend dummy|alsa|pulseaudio|jack|coreaudio|wasapi]\n"
-          "  [--device id]\n"
-          "  [--raw]\n"
-          "  [--name stream_name]\n"
-          "  [--latency seconds]\n"
-          "  [--sample-rate hz]\n"
-          , exe);
-  return 1;
-}
+/*
 static void write_sample_s16ne(char *ptr, double sample)
 {
   int16_t *buf = (int16_t *)ptr;
@@ -73,10 +61,10 @@ static void write_callback(struct SoundIoOutStream *outstream, int frame_count_m
     const struct SoundIoChannelLayout *layout = &outstream->layout;
     double pitch = 440.0;
     double radians_per_second = pitch * 2.0 * PI;
-    for (int frame = 0; frame < frame_count; frame += 1)
+    for (int frame = 0; frame < frame_count; ++frame)
     {
       double sample = sinf((seconds_offset + frame * seconds_per_frame) * radians_per_second);
-      for (int channel = 0; channel < layout->channel_count; channel += 1)
+      for (int channel = 0; channel < layout->channel_count; ++channel)
       {
         write_sample(areas[channel].ptr, sample);
         areas[channel].ptr += areas[channel].step;
@@ -101,6 +89,7 @@ static void underflow_callback(struct SoundIoOutStream *outstream)
   static int count = 0;
   fprintf(stderr, "underflow %d\n", count++);
 }
+*/
 
 int main(int argc, char **argv)
 {
@@ -119,92 +108,13 @@ int main(int argc, char **argv)
   
   auto* device = libsoundio.get_device();
   
-  struct SoundIoOutStream *outstream = soundio_outstream_create(device);
-  outstream->write_callback = write_callback;
-  outstream->underflow_callback = underflow_callback;
-  outstream->name = stream_name;
-  outstream->software_latency = latency;
-  outstream->sample_rate = sample_rate;
-  if (soundio_device_supports_format(device, SoundIoFormatFloat32NE))
-  {
-    outstream->format = SoundIoFormatFloat32NE;
-    write_sample = write_sample_float32ne;
-  }
-  else if (soundio_device_supports_format(device, SoundIoFormatFloat64NE))
-  {
-    outstream->format = SoundIoFormatFloat64NE;
-    write_sample = write_sample_float64ne;
-  }
-  else if (soundio_device_supports_format(device, SoundIoFormatS32NE))
-  {
-    outstream->format = SoundIoFormatS32NE;
-    write_sample = write_sample_s32ne;
-  }
-  else if (soundio_device_supports_format(device, SoundIoFormatS16NE))
-  {
-    outstream->format = SoundIoFormatS16NE;
-    write_sample = write_sample_s16ne;
-  }
-  else
-  {
-    fprintf(stderr, "No suitable device format available.\n");
-    return 1;
-  }
-  if ((err = soundio_outstream_open(outstream)))
-  {
-    fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
-    return 1;
-  }
-  fprintf(stderr, "Software latency: %f\n", outstream->software_latency);
-  fprintf(stderr,
-          "'p\\n' - pause\n"
-          "'u\\n' - unpause\n"
-          "'P\\n' - pause from within callback\n"
-          "'c\\n' - clear buffer\n"
-          "'q\\n' - quit\n");
-  if (outstream->layout_error)
-    fprintf(stderr, "unable to set channel layout: %s\n", soundio_strerror(outstream->layout_error));
-  if ((err = soundio_outstream_start(outstream)))
-  {
-    fprintf(stderr, "unable to start device: %s\n", soundio_strerror(err));
-    return 1;
-  }
-  for (;;)
-  {
-    soundio_flush_events(soundio);
-    int c = getc(stdin);
-    if (c == 'p') {
-      fprintf(stderr, "pausing result: %s\n",
-              soundio_strerror(soundio_outstream_pause(outstream, true)));
-    }
-    else if (c == 'P')
-    {
-      want_pause = true;
-    }
-    else if (c == 'u')
-    {
-      want_pause = false;
-      fprintf(stderr, "unpausing result: %s\n",
-              soundio_strerror(soundio_outstream_pause(outstream, false)));
-    }
-    else if (c == 'c')
-    {
-      fprintf(stderr, "clear buffer result: %s\n",
-              soundio_strerror(soundio_outstream_clear_buffer(outstream)));
-    }
-    else if (c == 'q')
-    {
-      break;
-    }
-    else if (c == '\r' || c == '\n')
-    {
-      // ignore
-    }
-    else
-    {
-      fprintf(stderr, "Unrecognized command: %c\n", c);
-    }
-  }
+  unsigned int src_id = libsoundio.create_source();
+  unsigned int buf_id = libsoundio.create_buffer();
+  
+  
+  
+  libsoundio.destroy_buffer(buf_id);
+  libsoundio.destroy_source(src_id);
   
   libsoundio.finish();
   
