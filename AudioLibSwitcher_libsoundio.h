@@ -51,12 +51,13 @@ namespace audio
       SoundIoOutStream* outstream = nullptr;
       double latency = 0.0;
       
-      void write_sample_s16ne(char *ptr, double sample)
+      void write_sample_s16ne(char *ptr, short sample)
       {
         int16_t *buf = (int16_t *)ptr;
-        double range = (double)INT16_MAX - (double)INT16_MIN;
-        double val = sample * range / 2.0;
-        *buf = val;
+        //double range = (double)INT16_MAX - (double)INT16_MIN;
+        //double val = sample * range / 2.0;
+        //*buf = val;
+        *buf = sample;
       }
       
       static void write_callback_static(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max, Source* source) {
@@ -65,6 +66,8 @@ namespace audio
       
       void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
       {
+        if (buffer == nullptr)
+          return;
         double float_sample_rate = outstream->sample_rate;
         double seconds_per_frame = 1.0 / float_sample_rate;
         struct SoundIoChannelArea *areas;
@@ -81,11 +84,9 @@ namespace audio
           if (!frame_count)
             break;
           const SoundIoChannelLayout* layout = &outstream->layout;
-          double pitch = 440.0;
-          double radians_per_second = pitch * 2.0f * math::c_pi;
           for (int frame = 0; frame < frame_count; ++frame)
           {
-            double sample = sinf((seconds_offset + frame * seconds_per_frame) * radians_per_second);
+            short sample = buffer->data[frame];
             for (int channel = 0; channel < layout->channel_count; ++channel)
             {
               write_sample_s16ne(areas[channel].ptr, sample);
