@@ -59,6 +59,10 @@ namespace audio
         *buf = val;
       }
       
+      static void write_callback_static(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max, Source* source) {
+        source->write_callback(outstream, frame_count_min, frame_count_max);
+      }
+      
       void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
       {
         double float_sample_rate = outstream->sample_rate;
@@ -113,7 +117,11 @@ namespace audio
         : m_device(device)
       {
         outstream = soundio_outstream_create(device);
-        outstream->write_callback = write_callback;
+        outstream->userdata = this; // Store pointer to this Source object
+        outstream->write_callback = [](struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
+        {
+          write_callback_static(outstream, frame_count_min, frame_count_max, static_cast<Source*>(outstream->userdata));
+        };
         outstream->underflow_callback = underflow_callback;
         outstream->name = stream_name.data();
         outstream->software_latency = latency;
