@@ -95,12 +95,24 @@ int main(int argc, char **argv)
 {
   audio::AudioLibSwitcher_libsoundio libsoundio;
   
-  enum SoundIoBackend backend = SoundIoBackendNone;
-  bool raw = false;
-  char *stream_name = NULL;
-  double latency = 0.0;
-  int sample_rate = 0;
-  int err = 0;
+  // ////////
+  
+  std::vector<short> data;
+  int sample_rate = 44100;
+  float dur = 3.f;
+  float freq = 440.f;
+  size_t num_samples = static_cast<int>(dur * sample_rate);
+  float dt = 1.f/sample_rate;
+  
+  data.resize(num_samples);
+  for (size_t i = 0; i < num_samples; ++i)
+  {
+    float t = i * dt;
+    float sample = std::sin(math::c_2pi * freq * t);
+    data[i] = static_cast<short>(32767 * sample);
+  }
+  
+  // ////////
   
   libsoundio.init();
   
@@ -111,7 +123,9 @@ int main(int argc, char **argv)
   unsigned int src_id = libsoundio.create_source();
   unsigned int buf_id = libsoundio.create_buffer();
   
-  
+  libsoundio.set_buffer_data_mono_16(buf_id, data, sample_rate);
+  libsoundio.attach_buffer_to_source(src_id, buf_id);
+  libsoundio.play_source(src_id);
   
   libsoundio.destroy_buffer(buf_id);
   libsoundio.destroy_source(src_id);
