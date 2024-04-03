@@ -58,14 +58,21 @@ namespace audio
         *buf = sample;
       }
       
+      static void write_func_proxy(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
+      {
+        write_callback_static(outstream, frame_count_min, frame_count_max, static_cast<Source*>(outstream->userdata));
+      };
+      
       static void write_callback_static(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max, Source* source)
       {
+        //std::cout << "source: " << source << std::endl;
         if (source != nullptr)
           source->write_callback(outstream, frame_count_min, frame_count_max);
       }
       
       void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
       {
+        //std::cout << "buffer: " << buffer << std::endl;
         if (buffer == nullptr)
           return;
         double float_sample_rate = outstream->sample_rate;
@@ -128,13 +135,11 @@ namespace audio
       
       void init()
       {
+        //std::cout << "name: " << m_stream_name << std::endl;
         outstream->underflow_callback = underflow_callback;
         outstream->name = m_stream_name.c_str();
         outstream->userdata = this; // Store pointer to this Source object
-        outstream->write_callback = [](struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
-        {
-          write_callback_static(outstream, frame_count_min, frame_count_max, static_cast<Source*>(outstream->userdata));
-        };
+        outstream->write_callback = write_func_proxy;
       }
       
       void set_buffer_data_mono_16(SoundIoDevice* device)
@@ -283,7 +288,11 @@ namespace audio
       void attach_buffer_to_source(size_t source_id, Buffer* buffer)
       {
         if (source_id < m_sources.size())
-          m_sources[source_id]->buffer = buffer;
+        {
+          auto& source = m_sources[source_id];
+          source->buffer = buffer;
+          source->outstream->sample_rate = buffer->sample_rate;
+        }
       }
       
       void open_stream(size_t source_id)
@@ -435,6 +444,7 @@ namespace audio
     
     virtual void play_source(unsigned int src_id) override
     {
+      //fprintf(stderr, "Backend: %s\n", soundio_backend_name(m_soundio->current_backend));
       m_source_manager->play(src_id);
     }
     
