@@ -128,6 +128,18 @@ int main(int argc, char **argv)
   libsoundio.attach_buffer_to_source(src_id, buf_id);
   libsoundio.play_source(src_id);
   
+#if 1
+  for (;;)
+  {
+    soundio_flush_events(soundio);
+    int c = getc(stdin);
+    if (c == 'q')
+      break;
+  }
+#else
+  soundio_flush_events(soundio);
+#endif
+  
   libsoundio.destroy_buffer(buf_id);
   libsoundio.destroy_source(src_id);
   
