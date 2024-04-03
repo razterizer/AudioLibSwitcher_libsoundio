@@ -37,7 +37,6 @@ namespace audio
     // Source class
     struct Source
     {
-      SoundIoDevice* m_device = nullptr;
       float volume = 1.f;
       Buffer* buffer = nullptr;
       int sample_count = 0;
@@ -47,9 +46,8 @@ namespace audio
       float pitch = 0.f;
       bool want_pause = false;
       double seconds_offset = 0.0;
-      //std::future<void> playback_handle;
       SoundIoOutStream* outstream = nullptr;
-      double latency = 0.0;
+      std::string m_stream_name;
       
       void write_sample_s16ne(char *ptr, short sample)
       {
@@ -60,8 +58,10 @@ namespace audio
         *buf = sample;
       }
       
-      static void write_callback_static(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max, Source* source) {
-        source->write_callback(outstream, frame_count_min, frame_count_max);
+      static void write_callback_static(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max, Source* source)
+      {
+        if (source != nullptr)
+          source->write_callback(outstream, frame_count_min, frame_count_max);
       }
       
       void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
@@ -115,17 +115,9 @@ namespace audio
       }
       
       Source(SoundIoDevice* device, std::string_view stream_name)
-        : m_device(device)
+        : m_stream_name(stream_name)
       {
         outstream = soundio_outstream_create(device);
-        outstream->userdata = this; // Store pointer to this Source object
-        outstream->write_callback = [](struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
-        {
-          write_callback_static(outstream, frame_count_min, frame_count_max, static_cast<Source*>(outstream->userdata));
-        };
-        outstream->underflow_callback = underflow_callback;
-        outstream->name = stream_name.data();
-        outstream->software_latency = latency;
       }
       
       ~Source()
@@ -134,26 +126,23 @@ namespace audio
           soundio_outstream_destroy(outstream);
       }
       
-      void copy_from(const Source& other)
+      void init()
       {
-        this->volume = other.volume;
-        this->buffer = other.buffer;
-        this->sample_count = other.sample_count;
-        this->position = other.position;
-        this->is_playing = other.is_playing;
-        this->looping = other.looping;
-        this->pitch = other.pitch;
-        this->latency = other.latency;
-        this->m_device = other.m_device;
-        //this->playback_handle = other.playback_handle;
+        outstream->underflow_callback = underflow_callback;
+        outstream->name = m_stream_name.c_str();
+        outstream->userdata = this; // Store pointer to this Source object
+        outstream->write_callback = [](struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
+        {
+          write_callback_static(outstream, frame_count_min, frame_count_max, static_cast<Source*>(outstream->userdata));
+        };
       }
       
-      void set_buffer_data_mono_16()
+      void set_buffer_data_mono_16(SoundIoDevice* device)
       {
-        if (soundio_device_supports_format(m_device, SoundIoFormatS16NE))
+        if (soundio_device_supports_format(device, SoundIoFormatS16NE))
         {
           outstream->format = SoundIoFormatS16NE;
-          //write_sample = write_sample_s16ne;
+          //write_sample = write_sample_s16ne; // #FIXME: (?) Reimplement function pointer write_sample?
         }
         //else if (soundio_device_supports_format(device, SoundIoFormatFloat32NE))
         //{
@@ -182,19 +171,16 @@ namespace audio
     private:
       std::vector<std::unique_ptr<Source>> m_sources;
       SoundIo* m_soundio = nullptr;
-      SoundIoDevice* m_device = nullptr;
       
     public:
-      SourceManager(SoundIo* soundio, SoundIoDevice* device)
+      SourceManager(SoundIo* soundio)
         : m_soundio(soundio)
-        , m_device(device)
       {}
       
-      size_t add_source(const Source& source)
+      size_t add_source(SoundIoDevice* device)
       {
         auto src_id = m_sources.size();
-        auto& src_ptr = m_sources.emplace_back(std::make_unique<Source>(m_device, "source-" + std::to_string(src_id)));
-        src_ptr->copy_from(source);
+        m_sources.emplace_back(std::make_unique<Source>(device, "source-" + std::to_string(src_id)));
         return src_id;
       }
       
@@ -288,10 +274,10 @@ namespace audio
         }
       }
       
-      void set_buffer_data_mono_16(size_t source_id)
+      void set_buffer_data_mono_16(SoundIoDevice* device, size_t source_id)
       {
         if (source_id < m_sources.size())
-          m_sources[source_id]->set_buffer_data_mono_16();
+          m_sources[source_id]->set_buffer_data_mono_16(device);
       }
       
       void attach_buffer_to_source(size_t source_id, Buffer* buffer)
@@ -305,11 +291,13 @@ namespace audio
         if (source_id < m_sources.size())
         {
           auto* source = m_sources[source_id].get();
-          if (int err = soundio_outstream_open(source->outstream); err != 0)
+          auto* outstream = source->outstream;
+          if (int err = soundio_outstream_open(outstream); err != 0)
             throw std::runtime_error("unable to open device: " + std::string(soundio_strerror(err)));
-          std::cout << "Software latency: " + std::to_string(source->outstream->software_latency) << std::endl;
-          if (source->outstream->layout_error)
-            throw std::runtime_error("unable to set channel layout: " + std::string(soundio_strerror(source->outstream->layout_error)));
+          std::cout << "Software latency: " + std::to_string(outstream->software_latency) << std::endl;
+          if (outstream->layout_error)
+            throw std::runtime_error("unable to set channel layout: " + std::string(soundio_strerror(outstream->layout_error)));
+          source->init();
         }
       }
       
@@ -330,12 +318,10 @@ namespace audio
       std::vector<std::unique_ptr<Buffer>> m_buffers;
       
     public:
-      size_t add_buffer(const Buffer& buffer)
+      size_t add_buffer()
       {
         auto buf_id = m_buffers.size();
-        auto& buf_ptr = m_buffers.emplace_back(std::make_unique<Buffer>());
-        buf_ptr->data = buffer.data;
-        buf_ptr->sample_rate = buffer.sample_rate;
+        m_buffers.emplace_back(std::make_unique<Buffer>());
         return buf_id;
       }
       
@@ -370,7 +356,7 @@ namespace audio
   public:
     virtual void init() override
     {
-      m_source_manager = std::make_unique<SourceManager>(m_soundio, m_device);
+      m_source_manager = std::make_unique<SourceManager>(m_soundio);
       m_buffer_manager = std::make_unique<BufferManager>();
     
       // Initialize libsoundio
@@ -426,8 +412,7 @@ namespace audio
     unsigned int create_source() override
     {
       // Create a new source and return its ID
-      Source source(m_device, "");
-      auto src_id = m_source_manager->add_source(source);
+      auto src_id = m_source_manager->add_source(m_device);
       return static_cast<unsigned int>(src_id);
     }
     
@@ -439,8 +424,7 @@ namespace audio
     unsigned int create_buffer() override
     {
       // Create a new buffer and return its ID
-      Buffer buffer;
-      auto buf_id = m_buffer_manager->add_buffer(buffer);
+      auto buf_id = m_buffer_manager->add_buffer();
       return static_cast<unsigned int>(buf_id);
     }
     
@@ -501,7 +485,7 @@ namespace audio
     
     virtual void attach_buffer_to_source(unsigned int src_id, unsigned int buf_id) override
     {
-      m_source_manager->set_buffer_data_mono_16(src_id);
+      m_source_manager->set_buffer_data_mono_16(m_device, src_id);
       
       auto* buffer = m_buffer_manager->get_buffer(buf_id);
       m_source_manager->attach_buffer_to_source(src_id, buffer);

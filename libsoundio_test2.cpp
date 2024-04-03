@@ -110,6 +110,7 @@ int main(int argc, char **argv)
     float t = i * dt;
     float sample = std::sin(math::c_2pi * freq * t);
     data[i] = static_cast<short>(32767 * sample);
+    //std::cout << data[i] << ", ";
   }
   
   // ////////
