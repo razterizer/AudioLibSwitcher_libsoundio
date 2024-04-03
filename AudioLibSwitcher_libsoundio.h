@@ -288,7 +288,7 @@ namespace audio
           auto* outstream = source->outstream;
           if (int err = soundio_outstream_open(outstream); err != 0)
             throw std::runtime_error("unable to open device: " + std::string(soundio_strerror(err)));
-          std::cout << "Software latency: " + std::to_string(outstream->software_latency) << std::endl;
+          //std::cout << "Software latency: " + std::to_string(outstream->software_latency) << std::endl;
           if (outstream->layout_error)
             throw std::runtime_error("unable to set channel layout: " + std::string(soundio_strerror(outstream->layout_error)));
           source->init();
