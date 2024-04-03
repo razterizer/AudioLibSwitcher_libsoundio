@@ -194,21 +194,6 @@ namespace audio
         return stlutils::erase_at(m_sources, source_id);
       }
       
-      void mix_audio(float* buffer, int frameCount)
-      {
-        // Clear the buffer
-        std::fill(buffer, buffer + frameCount, 0.0f);
-        
-        // Mix audio data from each active source
-        for (auto& source : m_sources)
-          if (source->is_playing)
-            for (int i = 0; i < frameCount && source->position < source->sample_count; ++i)
-            {
-              buffer[i] += source->buffer->data[source->position] * source->volume;
-              ++source->position;
-            }
-      }
-      
       bool is_playing(size_t source_id) const
       {
         if (source_id < m_sources.size())
