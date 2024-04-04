@@ -37,12 +37,11 @@ namespace audio
     // Source class
     struct Source
     {
-      float volume = 1.f;
       Buffer* buffer = nullptr;
-      int sample_count = 0;
-      int position = 0;
+      size_t position = 0;
       bool is_playing = false;
       bool looping = false;
+      float volume = 1.f;
       float pitch = 0.f;
       bool want_pause = false;
       double seconds_offset = 0.0;
@@ -72,15 +71,19 @@ namespace audio
       
       void write_callback(struct SoundIoOutStream *outstream, int frame_count_min, int frame_count_max)
       {
-        //std::cout << "buffer: " << buffer << std::endl;
-        if (buffer == nullptr)
+        if (buffer == nullptr || !is_playing)
           return;
-        double float_sample_rate = outstream->sample_rate;
-        double seconds_per_frame = 1.0 / float_sample_rate;
+        
+        double sample_rate = outstream->sample_rate;
+        double seconds_per_frame = 1.0 / sample_rate;
+        //std::cout << "dur: " << buffer->data.size() / sample_rate << '\n';
+        double elapsed_seconds = seconds_offset;  // Start from the current offset
+        
         struct SoundIoChannelArea *areas;
         int err;
         int frames_left = frame_count_max;
-        for (;;)
+        
+        while (frames_left > 0 && elapsed_seconds < buffer->data.size() / sample_rate)
         {
           int frame_count = frames_left;
           if ((err = soundio_outstream_begin_write(outstream, &areas, &frame_count)))
@@ -90,17 +93,30 @@ namespace audio
           }
           if (!frame_count)
             break;
+          
           const SoundIoChannelLayout* layout = &outstream->layout;
           for (int frame = 0; frame < frame_count; ++frame)
           {
-            short sample = buffer->data[frame];
+            if (position >= buffer->data.size())
+            {
+              if (looping)
+                position = 0;
+              else
+              {
+                is_playing = false;
+                break;
+              }
+            }
+            short sample = buffer->data[position++];
             for (int channel = 0; channel < layout->channel_count; ++channel)
             {
               write_sample_s16ne(areas[channel].ptr, sample);
               areas[channel].ptr += areas[channel].step;
             }
           }
-          seconds_offset += seconds_per_frame * frame_count;
+          
+          elapsed_seconds += seconds_per_frame * frame_count;
+          
           if ((err = soundio_outstream_end_write(outstream)))
           {
             if (err == SoundIoErrorUnderflow)
@@ -108,12 +124,23 @@ namespace audio
             fprintf(stderr, "unrecoverable stream error: %s\n", soundio_strerror(err));
             exit(1);
           }
+          
           frames_left -= frame_count;
           if (frames_left <= 0)
-            break;
+          {
+            if (looping)
+              frames_left = frame_count;
+            else
+            {
+              is_playing = false;
+              break;
+            }
+          }
         }
+        
         soundio_outstream_pause(outstream, want_pause);
       }
+      
       
       static void underflow_callback(struct SoundIoOutStream *outstream)
       {
@@ -199,9 +226,7 @@ namespace audio
         if (source_id < m_sources.size())
         {
           const auto& source = m_sources[source_id];
-          // Check if the playback handle is valid and if the associated task is still running
-          //return source->is_playing && source->playback_handle.valid() && source->playback_handle.wait_for(std::chrono::seconds(0)) == std::future_status::timeout;
-          return false;
+          return source->is_playing;
         }
         else
           return false;
