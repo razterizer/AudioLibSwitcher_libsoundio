@@ -2,6 +2,7 @@
 
 ![GitHub License](https://img.shields.io/github/license/razterizer/AudioLibSwitcher_libsoundio?color=blue)
 ![Static Badge](https://img.shields.io/badge/linkage-header_only-yellow)
+![Static Badge](https://img.shields.io/badge/3rdparty_linkage-static_/_dynamic-yellow)
 ![Static Badge](https://img.shields.io/badge/C%2B%2B-20-yellow)
 
 This is to become an adapter of the `IAudioLibSwitcher` interface for `libsoundio` which is of MIT license.
