@@ -6,8 +6,8 @@
 //
 
 #pragma once
-#include "../Core/Math.h"
-#include "../Core/StlUtils.h"
+#include "Core/Math.h"
+#include "Core/StlUtils.h"
 #include "AudioLibSwitcher/IAudioLibSwitcher.h"
 #include <iostream>
 #include <vector>
